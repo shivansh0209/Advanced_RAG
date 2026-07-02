@@ -1,19 +1,25 @@
-from langchain_ollama import ChatOllama 
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langsmith import traceable
 
-llm = ChatOllama(model="mistral")
 
-prompt = ChatPromptTemplate([
-    ("system", "Answer the question based only on the following context and say no if the answer is not contained within the context.\nJust give the answer without any additional commentary or explanation."),
-    ("user", "{context}\n\nQuestion: {question}")
-])
-
-parser = StrOutputParser()
 
 @traceable(name="generate_answer")
 def generate_answer(query, retrieved_docs):
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.7)
+
+    prompt = ChatPromptTemplate([
+    ("system", 
+     "You are a legal expert on Indian statutes.\n"
+     "Answer using ONLY the provided context. If the context covers multiple acts, address each one separately.\n"
+     "If the answer is not in the context, say 'Not found in context.'\n"
+     "Be precise. Cite section numbers when available."),
+    ("user", "{context}\n\nQuestion: {question}")
+])
+
+    parser = StrOutputParser()
+
     context = "\n\n".join(doc.page_content for doc in retrieved_docs)
     chain = prompt | llm | parser
     response = chain.invoke({"context": context, "question": query})

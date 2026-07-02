@@ -1,5 +1,6 @@
 import uuid
 import pickle
+from src.utils import LocalEmbeddings
 from langsmith import traceable
 from pathlib import Path
 from langchain_chroma import Chroma
@@ -8,7 +9,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_classic.storage._lc_store import create_kv_docstore
 from langchain_classic.storage import LocalFileStore
 from src.hybrid_retrieval_class import CustomHybridParentRetriever
-from src.utils import LocalEmbeddings, split_by_legal_section
+from src.utils import split_by_legal_section
 from src.data_loaders  import load_documents
 
 
@@ -17,7 +18,7 @@ def _is_vectorstore_populated(persist_directory: str, collection_name: str, embe
     vectorstore = Chroma(
         collection_name=collection_name,
         persist_directory=persist_directory,
-        embedding_function=LocalEmbeddings(model_name=embedding_model_name)
+        embedding_function=LocalEmbeddings(model_name="all-MiniLM-L6-v2")
     )
     count = vectorstore._collection.count()
     return count > 0, vectorstore
@@ -36,7 +37,7 @@ def _save_bm25(retriever: BM25Retriever, bm25_path: str):
         pickle.dump(retriever, f)
 
 
-@traceable(name="parent_document_retriever_setup")
+@traceable(name="Hybrid Retrieval Setup")
 def parent_document_retriever_setup(
     docs=None,
     collection_name="research_papers",
@@ -94,8 +95,15 @@ def parent_document_retriever_setup(
             all_child_chunks.append(child)
 
     # Step 2: Populate Vector Store (Chroma)
-    for i in range(0, len(all_child_chunks), 5000):
-        vectorstore.add_documents(all_child_chunks[i:i + 5000])
+    import time
+
+    # Define a safe batch size for the free tier
+    BATCH_SIZE = 5000 
+    print(f"Total child chunks to embed: {len(all_child_chunks)}")
+    print("Embedding chunks in rate-limit safe batches...")
+
+    for i in range(0, len(all_child_chunks), BATCH_SIZE):
+        vectorstore.add_documents(all_child_chunks[i:i + BATCH_SIZE])
     print(f"✅ Chroma vectorstore populated with {len(all_child_chunks)} child chunks.")
 
     # Step 3: Build & persist BM25

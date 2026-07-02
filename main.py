@@ -4,7 +4,7 @@ from langsmith import traceable
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 from src.hybrid_text_splitters import parent_document_retriever_setup
 from src.generate_answers import generate_answer
-from src.utils import get_hyde_answer
+from src.utils import get_hyde_answer_and_refined_prompt
 
 import os
 
@@ -23,11 +23,10 @@ def main():
         collection_name=COLLECTION_NAME,
         persist_directory=PERSIST_DIR,
     )
-
     query = input("\nAsk a question: ")
-    hyde_answer = get_hyde_answer(query)
+    hyde_answer, refined_query = get_hyde_answer_and_refined_prompt(query)
 
-    context = retriever.invoke(query + "||| " + hyde_answer)
+    context = retriever.invoke(refined_query)
     answer = generate_answer(query, context)
 
     print("\nAnswer:", answer)
