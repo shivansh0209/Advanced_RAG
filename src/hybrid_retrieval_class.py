@@ -2,6 +2,7 @@ from langchain_chroma import Chroma
 from langchain_core.retrievers import BaseRetriever
 from langchain_community.retrievers import BM25Retriever
 from src.utils import rerank_with_cohere
+from langsmith import traceable
 
 class CustomHybridParentRetriever(BaseRetriever):
     vectorstore: Chroma
@@ -14,6 +15,17 @@ class CustomHybridParentRetriever(BaseRetriever):
     class Config:
         arbitrary_types_allowed = True
 
+
+    @traceable(name="BM25Retriever")
+    def _get_bm25_results(self, query):
+        self.bm25_retriever.k = self.top_k * 5
+        return self.bm25_retriever.invoke(query)[:self.top_k * 5]
+    
+    @traceable(name="vectorstore_retrieval")
+    def get_vectorstore_results(self, query):
+        return self.vectorstore.similarity_search(query, k=self.top_k * 5)
+
+    @traceable(name="CustomHybridParentRetriever.invoke")
     def _get_relevant_documents(self, query):
         
         # 1. Fetch raw candidates from both search engines (get double top_k for filtering)
@@ -23,10 +35,8 @@ class CustomHybridParentRetriever(BaseRetriever):
             original_query = query
             hyde_answer = query
 
-        fetch_count = self.top_k * 5
-        vector_results = self.vectorstore.similarity_search(hyde_answer, k=fetch_count)
-        self.bm25_retriever.k = self.top_k * 2
-        bm25_results = self.bm25_retriever.invoke(original_query)[:fetch_count]
+        vector_results = self.get_vectorstore_results(hyde_answer)
+        bm25_results = self._get_bm25_results(original_query)
 
         # 2. Score parents using Reciprocal Rank Fusion (RRF)
         rrf_scores = {}

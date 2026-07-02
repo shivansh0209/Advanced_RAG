@@ -1,6 +1,7 @@
 from langchain_ollama import ChatOllama 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langsmith import traceable
 
 llm = ChatOllama(model="mistral")
 
@@ -11,6 +12,7 @@ prompt = ChatPromptTemplate([
 
 parser = StrOutputParser()
 
+@traceable(name="generate_answer")
 def generate_answer(query, retrieved_docs):
     context = "\n\n".join(doc.page_content for doc in retrieved_docs)
     chain = prompt | llm | parser
