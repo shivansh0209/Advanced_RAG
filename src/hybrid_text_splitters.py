@@ -4,8 +4,8 @@ from langchain_community.retrievers import BM25Retriever
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_classic.storage._lc_store import create_kv_docstore
 from langchain_classic.storage import LocalFileStore
-from hybrid_retrieval_class import CustomHybridParentRetriever
-from utils import LocalEmbeddings
+from src.hybrid_retrieval_class import CustomHybridParentRetriever
+from src.utils import LocalEmbeddings
 
 
 def parent_document_retriever_setup(docs, collection_name="research_papers", persist_directory="chroma_db", embedding_model_name="all-MiniLM-L6-v2", parent_chunk_size=1500, parent_chunk_overlap=200, child_chunk_size=400, child_chunk_overlap=60):

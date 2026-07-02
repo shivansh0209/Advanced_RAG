@@ -77,5 +77,6 @@ desktop.ini
 .coverage
 htmlcov/
 
-
+chroma_db/*
+parent_docs/*
 data/*

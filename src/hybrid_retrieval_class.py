@@ -1,8 +1,7 @@
-import cohere
 from langchain_chroma import Chroma
 from langchain_core.retrievers import BaseRetriever
 from langchain_community.retrievers import BM25Retriever
-from utils import rerank_with_cohere
+from src.utils import rerank_with_cohere
 
 class CustomHybridParentRetriever(BaseRetriever):
     vectorstore: Chroma
@@ -51,8 +50,6 @@ class CustomHybridParentRetriever(BaseRetriever):
 
         if not final_parent_docs:
             return []
-
-        print(f"Reranking {len(final_parent_docs)} parent documents using Cohere Rerank API...")
 
         return rerank_with_cohere(original_query, final_parent_docs, top_k=self.top_k)
 
