@@ -77,6 +77,17 @@ desktop.ini
 .coverage
 htmlcov/
 
-chroma_db/*
-parent_docs/*
-data/*
+backend/chroma_db/*
+backend/parent_docs/*
+backend/data/*
+
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+frontend/coverage/
+frontend/.DS_Store
+frontend/*.log
+frontend/.env*
+frontend/!.env.example
+
+frontend/package-lock.json

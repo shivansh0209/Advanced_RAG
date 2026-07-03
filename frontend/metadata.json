@@ -1,0 +1,6 @@
+{
+  "name": "LexAI",
+  "description": "A high-precision intelligence terminal for Indian law, covering CrPC, RTI, HMA, IT Act, CPA, ICA, and IPC.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
