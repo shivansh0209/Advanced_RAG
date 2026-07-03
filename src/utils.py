@@ -1,6 +1,7 @@
 import os
 import cohere
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 from langsmith import traceable
 from sentence_transformers import SentenceTransformer
 from langchain_core.embeddings import Embeddings
@@ -10,13 +11,13 @@ from langchain_core.documents import Document
 import re
 
 ACT_NAMES = {
-    "data/CRPC1973.pdf": "code of criminal procedure, 1973",
-    "data/aa2005.pdf": "right to information act, 2005",
-    "data/A2013-18.pdf": "indian contract act, 2013",
-    "data/A1955-25Eng.pdf": "hindu marriage act, 1955",
-    "data/it_act_2000.pdf": "information technology act, 2000",
-    "data/AA1860-21.pdf": "indian penal code, 1860",
-    "data/cpa.pdf": "consumer protection act, 2019"
+    "data/crpc_1973.pdf":        "code of criminal procedure, 1973",
+    "data/rti_act_2005.pdf":         "right to information act, 2005",
+    "data/A1955-25.pdf":         "hindu marriage act, 1955", 
+    "data/it_act_2000.pdf":      "information technology act, 2000",
+    "data/cpa_2019.pdf":         "consumer protection act, 2019",
+    "data/contract.pdf":         "indian contract act, 1872",
+    "data/ipc_act.pdf":         "indian penal code, 1860",
 }
 
 
@@ -32,7 +33,7 @@ class LocalEmbeddings(Embeddings):
     
 @traceable(name="Hyde and Refine Prompt")
 def get_hyde_answer_and_refined_prompt(query, model_name="mistral"):
-    model = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
+    model = ChatGroq(model="llama-3.3-70b-versatile")
 
     prompt_for_hyde = PromptTemplate.from_template(
     "You are an Indian legal expert. Write a technical paragraph answering the question using precise statutory language.\n"
@@ -82,7 +83,7 @@ def rerank_with_cohere(query, documents, top_k=6):
     return [documents[result.index] for result in rerank_response.results]
 
 
-def split_by_legal_section(docs, max_parent_chars=2000):
+def split_by_legal_section(docs, max_parent_chars=3000):
     from collections import defaultdict
     grouped = defaultdict(list)
     for doc in docs:
@@ -156,7 +157,7 @@ def split_by_legal_section(docs, max_parent_chars=2000):
 
             else:
                 # No subsections found — hard split by character limit with overlap
-                overlap = 340
+                overlap = 500
                 step = max_parent_chars - overlap
                 for i, start in enumerate(range(0, len(enriched_content), step)):
                     chunk_text = enriched_content[start:start + max_parent_chars]

@@ -1,13 +1,14 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langchain_groq import ChatGroq
 from langsmith import traceable
 
 
 
 @traceable(name="generate_answer")
 def generate_answer(query, retrieved_docs):
-    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.7)
+    llm = ChatGroq(model="llama-3.3-70b-versatile")  
 
     prompt = ChatPromptTemplate([
     ("system", 
