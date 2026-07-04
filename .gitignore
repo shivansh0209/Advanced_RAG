@@ -91,3 +91,4 @@ frontend/.env*
 frontend/!.env.example
 
 frontend/package-lock.json
+*.docx
