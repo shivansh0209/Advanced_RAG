@@ -35,7 +35,7 @@ export const MOCK_RESPONSES: Record<string, LegalResponse> = {
 export const DEFAULT_RESPONSE = (question: string): LegalResponse => {
   return {
     question,
-    answer: `We are unable to provide a response at this time. Please try again later or contact support if the issue persists.`,
+    answer: `According to Section 404 of Developer Code of Conduct - We are unable to provide a response at this time. Please try again later or contact support if the issue persists.`,
     retrievedFrom: ["Developer Support"]
   };
 };
