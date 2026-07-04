@@ -24,13 +24,18 @@ export const MOCK_RESPONSES: Record<string, LegalResponse> = {
     question: "What are the legal implications of a breach of contract under the Indian Contract Act for service-level agreements?",
     answer: "Under the Indian Contract Act, 1872, a breach occurs when a party fails to perform their obligation as per the Service-Level Agreement (SLA). The primary remedy is damages as defined under Section 73, which entitles the aggrieved party to compensation for any loss or damage naturally arising from such a breach. \n\nIn cases where the contract stipulates a specific penalty amount for breach, Section 74 is applicable. This allows the court to award reasonable compensation not exceeding the amount so named, whether or not actual damage or loss is proved to have been caused. \n\nFor SLAs involving specific professional services, the courts also look at the doctrine of Quantum Meruit, ensuring that a party is paid for the value of services already rendered before the breach occurred. Failure to adhere to \"Time is of the Essence\" clauses—common in technology SLAs—can lead to the contract becoming voidable under Section 55.",
     retrievedFrom: ["Indian Contract Act, 1872", "Specific Relief Act, 1963", "IT Act, 2000"]
+  },
+  "API not responding": {
+    question: "",
+    answer: "Try later again some time. If the issue persists, please contact support.",
+    retrievedFrom: ["Developer Support"]
   }
 };
 
 export const DEFAULT_RESPONSE = (question: string): LegalResponse => {
   return {
     question,
-    answer: `Regarding your query "${question}":\n\nUnder the relevant provisions of the Indian Legal System, specific acts apply depending on the nature of the matter. For contract disputes, Section 73 of the Indian Contract Act, 1872 details the assessment of damages. For criminal liabilities, Section 379 or Section 302 of the Indian Penal Code (IPC) may apply. For civil procedures, the rules of Section 96 of the Code of Civil Procedure, 1908 govern appeals.\n\nIn administrative matters, Section 6 of the RTI Act, 2005 outlines access requests, while Section 13 of the Hindu Marriage Act, 1955 establishes grounds for divorce. If you can specify which of the 7 Indian Acts (CrPC, RTI, HMA, IT Act, CPA, ICA, IPC) your query primarily concerns, we can offer targeted statutory provisions.`,
-    retrievedFrom: ["Indian Penal Code, 1860", "Indian Contract Act, 1872", "Code of Civil Procedure, 1908"]
+    answer: `We are unable to provide a response at this time. Please try again later or contact support if the issue persists.`,
+    retrievedFrom: ["Developer Support"]
   };
 };

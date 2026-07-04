@@ -93,7 +93,7 @@ export default function App() {
 
     } catch (error) {
       console.error("API error:", error);
-      // setCurrentResponse(DEFAULT_RESPONSE(query));
+      setCurrentResponse(DEFAULT_RESPONSE("API not responding"));
       setScreenState("ANSWER");
     }
   };
