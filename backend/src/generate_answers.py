@@ -8,7 +8,7 @@ from langsmith import traceable
 
 @traceable(name="generate_answer")
 def generate_answer(query, retrieved_docs):
-    llm = ChatGroq(model="llama-3.3-70b-versatile")  
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
 
     prompt = ChatPromptTemplate([
     ("system", 

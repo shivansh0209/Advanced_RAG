@@ -1,15 +1,16 @@
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-from langchain_community.document_loaders import DirectoryLoader, PyPDFLoader
+from langchain_community.document_loaders import DirectoryLoader
+from langchain_community.document_loaders import TextLoader
 
-def load_documents(path="data", glob="**/*.pdf", loader_cls=PyPDFLoader):
+def load_documents(path="data", glob="**/*.md"):
     loader = DirectoryLoader(
         path=path,
         glob=glob,
         recursive=True,
         show_progress=True,
         use_multithreading=True,
-        loader_cls=loader_cls,
-        loader_kwargs={"strategy":"ocr_only", "language":"eng"} if loader_cls != PyPDFLoader else {}
+        loader_cls=TextLoader,
+        loader_kwargs={"encoding": "utf-8"}
     )
     return loader.load()

@@ -44,7 +44,7 @@ def parent_document_retriever_setup(
     persist_directory="chroma_db",
     embedding_model_name="all-MiniLM-L6-v2",
     child_chunk_size=400,
-    child_chunk_overlap=60,
+    child_chunk_overlap=80,
     bm25_path="bm25_retriever.pkl",
     parent_docs_dir="parent_docs",
 ):

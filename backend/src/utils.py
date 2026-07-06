@@ -9,15 +9,16 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 import re
+from collections import defaultdict
 
 ACT_NAMES = {
-    "data/crpc_1973.pdf":        "code of criminal procedure, 1973",
-    "data/rti_act_2005.pdf":         "right to information act, 2005",
-    "data/A1955-25.pdf":         "hindu marriage act, 1955", 
-    "data/it_act_2000.pdf":      "information technology act, 2000",
-    "data/cpa_2019.pdf":         "consumer protection act, 2019",
-    "data/contract.pdf":         "indian contract act, 1872",
-    "data/ipc_act.pdf":         "indian penal code, 1860",
+    "data/crpc_1973.md":    "code of criminal procedure, 1973",
+    "data/rti_act_2005.md": "right to information act, 2005",
+    "data/A1955-25.md":     "hindu marriage act, 1955",
+    "data/it_act_2000.md":  "information technology act, 2000",
+    "data/cpa_2019.md":          "consumer protection act, 2019",
+    "data/contract.md":     "indian contract act, 1872",
+    "data/ipc_act.md":      "indian penal code, 1860",
 }
 
 
@@ -30,39 +31,106 @@ class LocalEmbeddings(Embeddings):
 
     def embed_query(self, text):
         return self.model.encode([text], convert_to_numpy=True)[0].tolist()
-    
+
+
 @traceable(name="Hyde and Refine Prompt")
 def get_hyde_answer_and_refined_prompt(query, model_name="mistral"):
-    model = ChatGroq(model="llama-3.3-70b-versatile")
+    model = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
 
     prompt_for_hyde = PromptTemplate.from_template(
-    "You are an Indian legal expert. Write a technical paragraph answering the question using precise statutory language.\n"
-    "Rules:\n"
-    "- Do NOT guess section numbers — describe provisions in plain statutory language if unsure\n"
-    "- Use exact terminology found in Indian statutes\n"
-    "- If multiple acts are relevant, address each separately\n\n"
-    "Question: {question}"
-)
-
-    prompt_for_refinement = PromptTemplate.from_template(
-        "You are a search query optimizer for Indian statute text.\n"
-        "Rewrite the query to maximize keyword and semantic retrieval across ALL relevant acts.\n"
+        "You are an Indian legal expert. Write a technical paragraph answering the question using precise statutory language.\n"
         "Rules:\n"
-        "- Expand abbreviations (CrPC → Code of Criminal Procedure 1973, IPC → Indian Penal Code 1860)\n"
-        "- Add legal synonyms (arrest → custody, detained, apprehended)\n"
-        "- Add statutory terminology likely appearing verbatim in the acts\n"
-        "- If query spans multiple acts, include relevant terms from EACH act separately\n"
-        "- DO NOT invent section numbers\n"
-        "- Output only the rewritten query, nothing else\n\n"
-        "Query: {query}"
+        "- Do NOT guess section numbers — describe provisions in plain statutory language if unsure\n"
+        "- Use exact terminology found in Indian statutes\n"
+        "- If multiple acts are relevant, address each separately\n\n"
+        "Question: {question}"
     )
 
+    
+    prompt_for_refinement = PromptTemplate.from_template(
+        "You are a search query optimizer for Indian statute text used in a hybrid BM25 + vector retrieval system.\n\n"
+        "TASK: Rewrite the query to maximize retrieval of the most relevant statutory chunks.\n\n"
+        "STEP 1 — CLASSIFY the query into one or more of these types:\n"
+        "  [DEFINITIONAL]   — what is X, meaning of X, define X, what does X mean\n"
+        "  [PROCEDURAL]     — how, steps, process, when, produce, arrest, file, appeal\n"
+        "  [PENALTY]        — punishment, offence, fine, imprisonment, liable, convicted\n"
+        "  [RIGHTS]         — can I claim, entitled to, right to, relief available, remedy\n"
+        "  [DISTINCTION]    — difference between, distinguish, X vs Y, when does X become Y\n"
+        "  [EXCEPTION]      — exception to, when does X not apply, proviso, notwithstanding\n"
+        "  [OVERLAP]        — two or more acts mentioned, where do acts intersect or conflict\n"
+        "  [HYPOTHETICAL]   — named parties, scenario with multiple legal issues across acts\n"
+        "  [OTHER]          — none of the above, general query, broad question, multiple acts\n\n"
+        "STEP 2 — EXPAND abbreviations always:\n"
+        "  CrPC → Code of Criminal Procedure 1973\n"
+        "  IPC  → Indian Penal Code 1860\n"
+        "  IT Act → Information Technology Act 2000\n"
+        "  HMA  → Hindu Marriage Act 1955\n"
+        "  RTI  → Right to Information Act 2005\n"
+        "  CPA  → Consumer Protection Act 2019\n"
+        "  ICA  → Indian Contract Act 1872\n\n"
+        "STEP 3 — APPLY type-specific expansion rules:\n\n"
+        "  [DEFINITIONAL]:\n"
+        "    - Include verbatim anchors: 'means', 'shall mean', 'defined as', 'includes', 'definition'\n"
+        "    - CrPC defined terms (cognizable, bailable, warrant, summons, charge): add 'Section 2' and 'Schedule I'\n"
+        "    - IPC defined terms: add 'Chapter II' (general definitions section of IPC)\n"
+        "    - IT Act defined terms: add 'Section 2' (definitions section of IT Act)\n"
+        "    - HMA defined terms: add 'Section 3' (definitions section of HMA)\n"
+        "    - CPA defined terms: add 'Section 2' (definitions section of CPA)\n"
+        "    - ICA defined terms: add 'Section 2' (definitions section of ICA)\n\n"
+        "  [PROCEDURAL]:\n"
+        "    - Add: 'procedure', 'manner', 'shall', 'officer', 'magistrate', 'within'\n"
+        "    - Arrest cluster: 'without warrant', 'custody', 'produce before magistrate', 'twenty-four hours', 'grounds of arrest'\n"
+        "    - Bail cluster: 'bail', 'bond', 'bailable', 'non-bailable', 'release'\n"
+        "    - Investigation cluster: 'investigation', 'inquiry', 'First Information Report', 'cognizance'\n"
+        "    - Trial cluster: 'trial', 'charge', 'summons', 'warrant', 'sessions court'\n"
+        "    - Appeal cluster: 'appeal', 'revision', 'appellate authority', 'Commission'\n"
+        "    - RTI cluster: 'public authority', 'Public Information Officer', 'thirty days', 'Central Information Commission'\n\n"
+        "  [PENALTY]:\n"
+        "    - Add: 'punishable', 'imprisonment', 'fine', 'liable', 'conviction', 'shall be punished'\n"
+        "    - IPC homicide cluster: 'culpable homicide', 'murder', 'intention', 'knowledge', 'bodily injury', 'likely to cause death'\n"
+        "    - IPC fraud/forgery cluster: 'cheating', 'dishonestly', 'forgery', 'makes false document', 'fraudulently'\n"
+        "    - IPC marriage offences cluster: 'bigamy', 'void marriage', 'sapinda', 'prohibited degrees'\n"
+        "    - IPC modesty cluster: 'outraging modesty', 'assault', 'criminal force', 'voyeurism', 'stalking'\n"
+        "    - IT Act cyber offences cluster: 'computer resource', 'electronic record', 'data', 'unauthorised access'\n"
+        "    - IT Act privacy cluster: 'violation of privacy', 'publishes', 'transmits', 'intimate image'\n"
+        "    - IT Act identity cluster: 'identity theft', 'electronic signature', 'impersonation', 'password'\n"
+        "    - CPA penalty cluster: 'complaint', 'District Commission', 'opposite party', 'unfair trade practice'\n\n"
+        "  [RIGHTS]:\n"
+        "    - Add: 'entitled', 'right', 'may claim', 'relief', 'remedy', 'shall be liable to pay'\n"
+        "    - CPA rights cluster: 'deficiency in service', 'District Commission', 'complainant', 'Section 39', 'compensation'\n"
+        "    - CPA product liability cluster: 'product manufacturer', 'product seller', 'harm', 'defect', 'Chapter VI'\n"
+        "    - RTI rights cluster: 'information', 'public authority', 'applicant', 'deemed refusal'\n"
+        "    - ICA rights cluster: 'breach of contract', 'damages', 'specific performance', 'void agreement'\n\n"
+        "  [DISTINCTION]:\n"
+        "    - Include both terms being distinguished in full statutory language\n"
+        "    - Add the section numbers of both provisions if well-known (e.g. Section 299 and Section 300 IPC)\n"
+        "    - Add: 'difference', 'distinguished', 'amounts to', 'does not amount to'\n\n"
+        "  [EXCEPTION]:\n"
+        "    - Add: 'exception', 'proviso', 'notwithstanding', 'shall not apply', 'nothing in this section'\n"
+        "    - Include the parent provision being excepted from in full statutory name\n\n"
+        "  [OVERLAP]:\n"
+        "    - Name each act in full\n"
+        "    - Add 1-2 verbatim terms per act separately — do NOT blend terms across acts\n"
+        "    - Add: 'in addition to', 'not in derogation of', 'concurrent', 'inconsistency'\n"
+        "    - CPA + IT Act overlap anchor: 'Section 100 Consumer Protection Act', 'Section 43A Information Technology Act'\n\n"
+        "  [HYPOTHETICAL]:\n"
+        "    - Identify each distinct legal issue in the scenario separately\n"
+        "    - Expand each issue using its relevant act's verbatim terms\n"
+        "    - Do NOT blend terms — keep each act's expansion self-contained\n"
+        "    - Treat as CROSS-ACT only for acts explicitly implicated by the facts\n\n"
+        "STEP 4 — HARD CONSTRAINTS:\n"
+        "  - Do NOT invent section numbers\n"
+        "  - Do NOT add terms unless confident they appear verbatim in Indian statutes\n"
+        "  - Single-act queries: stay within that act, do NOT import terms from other acts\n"
+        "  - Keep rewritten query under max(60 words, original query length + 10)\n"
+        "  - Output ONLY the rewritten query — no labels, no classification, no explanation\n\n"
+        "Query: {query}"
+    )
     parser = StrOutputParser()
 
     chain_for_hyde = prompt_for_hyde | model | parser
     chain_for_refinement = prompt_for_refinement | model | parser
 
-    # hyde_answer = chain_for_hyde.invoke({"question": query})
     refined_query = chain_for_refinement.invoke({"query": query})
 
     return None, refined_query
@@ -70,101 +138,161 @@ def get_hyde_answer_and_refined_prompt(query, model_name="mistral"):
 
 @traceable(name="Cohere Reranking")
 def rerank_with_cohere(query, documents, top_k=6):
-    if(not os.environ.get("COHERE_API_KEY")):
+    if not os.environ.get("COHERE_API_KEY"):
         return documents
     cohere_client = cohere.Client(api_key=os.environ.get("COHERE_API_KEY"))
     rerank_response = cohere_client.rerank(
-            model="rerank-v3.5",
-            query=query,
-            documents=[doc.page_content for doc in documents],
-            top_n=top_k
-        )
-
+        model="rerank-v3.5",
+        query=query,
+        documents=[doc.page_content for doc in documents],
+        top_n=top_k
+    )
     return [documents[result.index] for result in rerank_response.results]
 
 
-def split_by_legal_section(docs, max_parent_chars=3000):
-    from collections import defaultdict
+# ── Compiled patterns ────────────────────────────────────────────────────────
+_SECTION_START = re.compile(
+    r'(?:(?:<sup>\d+</sup>)?\s*\[?\s*)?'
+    r'\*\*'
+    r'\[?'
+    r'(\d{1,4}[A-Z]?)'
+    r'\.'
+    r'(?!\s*</sup>)',
+    re.MULTILINE,
+)
+
+_FOOTNOTE_LINE = re.compile(
+    r'^[ \t]*(?:'
+    r'<sup>\d+\.?</sup>\.?\s+'           # <sup>1.</sup> or <sup>1</sup>.
+    r'|'
+    r'\d{1,3}\.\s+'                       # bare  1.  2.  12.
+    r'(?:Subs|Ins|Omit|Rep|Added|The\s|Cl\.|Proviso|See|vide|In\s|For\s|This\s|Certain|Words?|Clause)'
+    r')'
+    r'.*$',
+    re.MULTILINE,
+)
+
+_PAGE_NUMBER = re.compile(r'^\s*\d{1,3}\s*$', re.MULTILINE)
+_HTML_TABLE = re.compile(r'<table[\s\S]*?</table>', re.IGNORECASE)
+_PREAMBLE_END = re.compile(r'\n# THE ', re.IGNORECASE)
+_TOC_LINE = re.compile(
+    r'^[ \t]*\d{1,4}[A-Z]?\.\s+(?!\*\*)[A-Z*\[][^—\n]*$',
+    re.MULTILINE,
+)
+
+_SUBSECTION = re.compile(r'\n(?=\([\w]+\)\s)')
+
+
+def _clean_markdown(text: str) -> str:
+    text = _HTML_TABLE.sub('', text)
+    text = _FOOTNOTE_LINE.sub('', text)
+    text = _TOC_LINE.sub('', text)
+    text = _PAGE_NUMBER.sub('', text)
+    text = re.sub(r'<sup>\d+</sup>', '', text)
+    text = re.sub(r'\\\*\\\*\\\*', '', text)
+    text = re.sub(r'(?m)^[ \t]*\*[ \t]*\*[ \t]*\*.*$', '', text)
+    text = re.sub(r'\[([^\]]+)\]', r'\1', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
+
+
+def split_by_legal_section(docs, max_parent_chars: int = 4500) -> list[Document]:
     grouped = defaultdict(list)
     for doc in docs:
         grouped[doc.metadata.get("source")].append(doc)
 
     section_docs = []
-    section_pattern = re.compile(r'\n(?=\d{1,4}[A-Z]?\.\s)')
-
-    # Matches subsections like (1), (a), (i), (ii) — common in legal text
-    subsection_pattern = re.compile(r'\n(?=\([\w]+\)\s)')
 
     for source, pages in grouped.items():
         full_text = "\n".join(p.page_content for p in pages)
-        parts = section_pattern.split(full_text)
         act_name = ACT_NAMES.get(source, source)
 
-        for part in parts:
-            part = part.strip()
-            if not part:
+        preamble_matches = list(_PREAMBLE_END.finditer(full_text))
+        if preamble_matches:
+            best_idx, best_count = 0, -1
+            for i, m in enumerate(preamble_matches):
+                next_pos = preamble_matches[i + 1].start() if i + 1 < len(preamble_matches) else len(full_text)
+                count = len(_SECTION_START.findall(full_text[m.start():next_pos]))
+                if count > best_count:
+                    best_count, best_idx = count, i
+            full_text = full_text[preamble_matches[best_idx].start():]
+
+        first_section = _SECTION_START.search(full_text)
+        if first_section and first_section.start() > len(full_text.split('\n')[0]) + 5:
+            heading_end = full_text.find('\n') + 1
+            full_text = full_text[:heading_end] + full_text[first_section.start():]
+
+        # ── Find all section boundaries ───────────────────────────────────────
+        boundaries = [(m.start(), m.group(1)) for m in _SECTION_START.finditer(full_text)]
+
+        if not boundaries:
+            cleaned = _clean_markdown(full_text)
+            if cleaned:
+                section_docs.append(Document(
+                    page_content=f"{act_name}: {cleaned}",
+                    metadata={"source": source, "section": None, "act_name": act_name}
+                ))
+            continue
+
+        # ── Slice out each section and clean it ───────────────────────────────
+        for i, (start, section_num) in enumerate(boundaries):
+            end = boundaries[i + 1][0] if i + 1 < len(boundaries) else len(full_text)
+            cleaned = _clean_markdown(full_text[start:end])
+            if not cleaned:
                 continue
 
-            match = re.match(r'^(\d{1,4}[A-Z]?)\.\s', part)
-            section_num = match.group(1) if match else None
-            prefix = f"{act_name}, Section {section_num}" if section_num else act_name
+            prefix = f"{act_name}, Section {section_num}"
+            enriched = f"{prefix}: {cleaned}"
 
-            enriched_content = f"{prefix}: {part}"
-
-            # ── If section fits within limit, store as-is ──────────────────
-            if len(enriched_content) <= max_parent_chars:
+            # Fits within limit — store as-is
+            if len(enriched) <= max_parent_chars:
                 section_docs.append(Document(
-                    page_content=enriched_content,
+                    page_content=enriched,
                     metadata={"source": source, "section": section_num, "act_name": act_name}
                 ))
                 continue
 
-            # ── Section too large: try splitting on subsections first ───────
-            subsections = subsection_pattern.split(part)
+            # Too large — try splitting on subsection markers first
+            subsections = _SUBSECTION.split(cleaned)
 
             if len(subsections) > 1:
-                # Accumulate subsections into chunks under the char limit
                 current_chunk = ""
                 sub_index = 0
-
+                MIN_CHUNK_CHARS = 300   # never emit a parent chunk smaller than this
                 for sub in subsections:
                     sub = sub.strip()
                     if not sub:
                         continue
-
                     candidate = f"{prefix} (part {sub_index + 1}): {current_chunk}\n{sub}".strip()
-
                     if len(candidate) <= max_parent_chars:
                         current_chunk = f"{current_chunk}\n{sub}".strip()
                     else:
-                        # Save what we have, start a new chunk
-                        if current_chunk:
+                        if current_chunk and len(current_chunk) >= MIN_CHUNK_CHARS:
                             section_docs.append(Document(
                                 page_content=f"{prefix} (part {sub_index + 1}): {current_chunk}",
                                 metadata={"source": source, "section": section_num,
                                           "act_name": act_name, "part": sub_index + 1}
                             ))
                             sub_index += 1
-                        current_chunk = sub
-
-                # Save the last remaining chunk
+                            current_chunk = sub
+                        else:
+                            # Too small to emit alone — absorb into next chunk
+                            current_chunk = f"{current_chunk}\n{sub}".strip()
                 if current_chunk:
                     section_docs.append(Document(
                         page_content=f"{prefix} (part {sub_index + 1}): {current_chunk}",
                         metadata={"source": source, "section": section_num,
                                   "act_name": act_name, "part": sub_index + 1}
                     ))
-
             else:
-                # No subsections found — hard split by character limit with overlap
-                overlap = 500
+                # No subsections — hard split with overlap
+                overlap = 450
                 step = max_parent_chars - overlap
-                for i, start in enumerate(range(0, len(enriched_content), step)):
-                    chunk_text = enriched_content[start:start + max_parent_chars]
+                for j, start_char in enumerate(range(0, len(enriched), step)):
                     section_docs.append(Document(
-                        page_content=chunk_text,
+                        page_content=enriched[start_char: start_char + max_parent_chars],
                         metadata={"source": source, "section": section_num,
-                                  "act_name": act_name, "part": i + 1}
+                                  "act_name": act_name, "part": j + 1}
                     ))
 
     print(f"[split_by_legal_section] Total parent chunks created: {len(section_docs)}")

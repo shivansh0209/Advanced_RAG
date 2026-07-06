@@ -23,14 +23,13 @@ def main():
         collection_name=COLLECTION_NAME,
         persist_directory=PERSIST_DIR,
     )
-    while True:
-        query = input("\nAsk a question: ")
-        hyde_answer, refined_query = get_hyde_answer_and_refined_prompt(query)
+    query = input("\nAsk a question: ")
+    hyde_answer, refined_query = get_hyde_answer_and_refined_prompt(query)
 
-        context = retriever.invoke(refined_query)
-        answer = generate_answer(query, context)
+    context = retriever.invoke(refined_query)
+    answer = generate_answer(query, context)
 
-        print("\nAnswer:", answer)
+    print("\nAnswer:", answer)
 
 if __name__ == "__main__":
     main()
